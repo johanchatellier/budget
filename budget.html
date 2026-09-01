@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Mon budget</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+    background: #F6F4EF;
+    color: #20262B;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  header {
+    background: #20262B;
+    color: #F6F4EF;
+    padding: max(20px, env(safe-area-inset-top)) 18px 16px;
+    border-radius: 0 0 20px 20px;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .eyebrow { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #9CA9A5; margin-bottom: 2px; }
+  h1 { font-family: Georgia, serif; font-size: 26px; margin: 0; font-weight: 600; letter-spacing: -0.01em; }
+  #saveDot { width: 8px; height: 8px; border-radius: 50%; background: #C9A227; display: inline-block; opacity: 0; transition: opacity .2s; }
+  #saveDot.show { opacity: 1; }
+  .month-nav { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 14px; }
+  .nav-btn { background: rgba(255,255,255,0.08); border: none; border-radius: 999px; width: 34px; height: 34px; color: #F6F4EF; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+  .month-label { font-size: 16px; font-weight: 600; min-width: 110px; text-align: center; font-family: Georgia, serif; }
+  main { padding: 16px 14px 100px; max-width: 480px; margin: 0 auto; }
+  .card { background: #FFFFFF; border-radius: 16px; margin-bottom: 14px; border: 1px solid #E7E2D6; overflow: hidden; }
+  .card-header { display: flex; align-items: center; gap: 10px; padding: 14px 14px 12px; border-bottom: 1px solid #EFEBE0; }
+  .icon-bubble { width: 30px; height: 30px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 15px; }
+  .card-title { font-size: 14.5px; font-weight: 700; }
+  .card-sub { font-size: 11.5px; color: #8B8577; margin-top: 1px; }
+  .card-total-wrap { text-align: right; margin-left: auto; }
+  .card-total { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .ecart-tag { font-size: 10.5px; font-weight: 600; margin-top: 2px; }
+  .poste-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid #F2EFE6; }
+  .poste-row:last-child { border-bottom: none; }
+  .poste-label { font-size: 13px; color: #3A3F38; flex: 1; padding-right: 8px; }
+  .poste-right { display: flex; align-items: center; gap: 8px; }
+  .prevu-mini { font-size: 11px; color: #B4AF9F; font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
+  .reel-input { width: 68px; font-size: 13px; padding: 6px 8px; border-radius: 8px; border: 1px solid #E2DECF; background: #FBFAF6; text-align: right; font-variant-numeric: tabular-nums; color: #20262B; }
+  .ecart-mini { font-size: 10.5px; font-weight: 700; min-width: 34px; text-align: right; }
+  footer { position: fixed; bottom: 0; left: 0; right: 0; background: #FFFFFF; border-top: 1px solid #E7E2D6; padding: 14px 18px calc(14px + env(safe-area-inset-bottom)); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 -4px 16px rgba(0,0,0,0.06); }
+  .footer-label { font-size: 12px; color: #8B8577; font-weight: 600; }
+  .footer-prevu { font-size: 10.5px; color: #B4AF9F; }
+  .footer-solde { font-size: 24px; font-weight: 700; font-family: Georgia, serif; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div>
+      <div class="eyebrow">Foyer Chatellier · Chaussin</div>
+      <h1>Mon budget</h1>
+    </div>
+    <span id="saveDot"></span>
+  </div>
+  <div class="month-nav">
+    <button class="nav-btn" onclick="goMonth(-1)">‹</button>
+    <div class="month-label" id="monthLabel"></div>
+    <button class="nav-btn" onclick="goMonth(1)">›</button>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<footer>
+  <div>
+    <div class="footer-label" id="footerLabel">Solde</div>
+    <div class="footer-prevu" id="footerPrevu"></div>
+  </div>
+  <div class="footer-solde" id="footerSolde"></div>
+</footer>
+
+<script>
+const MONTHS = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+
+const SECTIONS = [
+  { id:"revenus", label:"Revenus", icon:"💶", tint:"#2D6A6A", sign:1, items:[
+    {id:"salaire", label:"Salaire net", prevu:1968},
+    {id:"pension", label:"Pension alimentaire", prevu:0},
+    {id:"af", label:"Allocations familiales", prevu:152},
+    {id:"parents", label:"Aide de vos parents", prevu:100},
+  ]},
+  { id:"charges", label:"Charges fixes", icon:"🏠", tint:"#8A5A2B", sign:-1, items:[
+    {id:"loyer", label:"Logement Chaussin", prevu:750},
+    {id:"garage", label:"Garage", prevu:50},
+    {id:"av1", label:"Assurance vie 1", prevu:15},
+    {id:"av2", label:"Assurance vie 2", prevu:53},
+    {id:"assauto", label:"Assurance auto", prevu:21.32},
+    {id:"virenf", label:"Virement enfants", prevu:30},
+    {id:"tel", label:"Téléphone", prevu:10},
+    {id:"ecole", label:"École enfants", prevu:70},
+    {id:"elec", label:"Électricité", prevu:173},
+    {id:"eau", label:"Eau", prevu:30},
+    {id:"asshab", label:"Assurance habitation", prevu:26},
+    {id:"mutuelle", label:"Mutuelle", prevu:78},
+    {id:"trot", label:"Assurance trottinette", prevu:7.25},
+    {id:"banque", label:"Frais bancaires", prevu:15},
+    {id:"violon", label:"Violon Zoé", prevu:24},
+    {id:"bus", label:"Transport bus", prevu:12.5},
+    {id:"essence", label:"Essence", prevu:150},
+  ]},
+  { id:"provisions", label:"Provisions", icon:"🐷", tint:"#6B5CA5", sign:-1, items:[
+    {id:"alim", label:"Alimentation", prevu:330},
+    {id:"vehicule", label:"Provision véhicule", prevu:80},
+    {id:"provenf", label:"Provision enfants", prevu:100},
+    {id:"provlog", label:"Provision logement", prevu:40},
+    {id:"sante", label:"Provision santé", prevu:20},
+    {id:"loisirs", label:"Loisirs / vacances", prevu:100},
+    {id:"epargne", label:"Épargne sécurité", prevu:100},
+  ]},
+];
+
+let monthIdx = new Date().getMonth();
+let reel = {};
+
+function eur(n) {
+  n = Number.isFinite(n) ? n : 0;
+  return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+}
+
+function storageKey(idx) { return "budget_reel_" + idx; }
+
+function loadMonth(idx) {
+  try {
+    const raw = localStorage.getItem(storageKey(idx));
+    reel = raw ? JSON.parse(raw) : {};
+  } catch(e) { reel = {}; }
+}
+
+function saveMonth(idx) {
+  localStorage.setItem(storageKey(idx), JSON.stringify(reel));
+  const dot = document.getElementById("saveDot");
+  dot.classList.add("show");
+  setTimeout(() => dot.classList.remove("show"), 900);
+}
+
+function goMonth(delta) {
+  monthIdx = (monthIdx + delta + 12) % 12;
+  loadMonth(monthIdx);
+  render();
+}
+
+function updateValue(itemId, value) {
+  value = value.replace(",", ".");
+  const num = value === "" ? undefined : parseFloat(value);
+  if (value === "" || Number.isNaN(num)) {
+    delete reel[itemId];
+  } else {
+    reel[itemId] = num;
+  }
+  saveMonth(monthIdx);
+  render(true);
+}
+
+function computeTotals() {
+  const bySection = {};
+  let soldeReel = 0, soldePrevu = 0;
+  for (const section of SECTIONS) {
+    let prevuSum = 0, reelSum = 0, anyReel = false;
+    for (const item of section.items) {
+      prevuSum += item.prevu;
+      const v = reel[item.id];
+      if (v !== undefined) { anyReel = true; reelSum += v; }
+      else { reelSum += item.prevu; }
+    }
+    bySection[section.id] = { prevuSum, reelSum, anyReel };
+    soldePrevu += section.sign * prevuSum;
+    soldeReel += section.sign * reelSum;
+  }
+  return { bySection, soldeReel, soldePrevu };
+}
+
+function render(skipInputRebuild) {
+  document.getElementById("monthLabel").textContent = MONTHS[monthIdx];
+  const totals = computeTotals();
+
+  if (!skipInputRebuild) {
+    const main = document.getElementById("main");
+    main.innerHTML = "";
+    for (const section of SECTIONS) {
+      const t = totals.bySection[section.id];
+      const card = document.createElement("section");
+      card.className = "card";
+
+      const headerHtml = `
+        <div class="card-header">
+          <div class="icon-bubble" style="background:${section.tint}1A;color:${section.tint}">${section.icon}</div>
+          <div>
+            <div class="card-title">${section.label}</div>
+            <div class="card-sub">Prévu ${eur(t.prevuSum)}</div>
+          </div>
+          <div class="card-total-wrap">
+            <div class="card-total" style="color:${section.tint}" id="total-${section.id}">${eur(t.reelSum)}</div>
+            <div class="ecart-tag" id="ecarttag-${section.id}"></div>
+          </div>
+        </div>
+      `;
+      card.innerHTML = headerHtml;
+
+      for (const item of section.items) {
+        const val = reel[item.id];
+        const hasVal = val !== undefined;
+        const row = document.createElement("div");
+        row.className = "poste-row";
+        row.innerHTML = `
+          <div class="poste-label">${item.label}</div>
+          <div class="poste-right">
+            <span class="prevu-mini">${eur(item.prevu)}</span>
+            <input class="reel-input" type="text" inputmode="decimal"
+              placeholder="${item.prevu.toFixed(2).replace(".", ",")}"
+              value="${hasVal ? String(val).replace(".", ",") : ""}"
+              data-item="${item.id}" data-sign="${section.sign}" />
+            <span class="ecart-mini" id="ecart-${item.id}"></span>
+          </div>
+        `;
+        card.appendChild(row);
+      }
+      main.appendChild(card);
+    }
+    main.querySelectorAll(".reel-input").forEach(inp => {
+      inp.addEventListener("input", (e) => updateValue(e.target.dataset.item, e.target.value));
+    });
+  }
+
+  // update dynamic numbers (écarts, totals, footer) without rebuilding inputs
+  for (const section of SECTIONS) {
+    const t = totals.bySection[section.id];
+    const totalEl = document.getElementById("total-" + section.id);
+    if (totalEl) totalEl.textContent = eur(t.reelSum);
+    const tagEl = document.getElementById("ecarttag-" + section.id);
+    if (tagEl) {
+      const diff = t.reelSum - t.prevuSum;
+      if (t.anyReel) {
+        const bad = section.sign === -1 ? diff > 0 : diff < 0;
+        tagEl.style.color = bad ? "#B5533C" : "#2D6A6A";
+        tagEl.textContent = (diff >= 0 ? "+" : "") + eur(diff);
+      } else {
+        tagEl.textContent = "";
+      }
+    }
+    for (const item of section.items) {
+      const val = reel[item.id];
+      const ecartEl = document.getElementById("ecart-" + item.id);
+      if (ecartEl) {
+        if (val !== undefined) {
+          const ecart = val - item.prevu;
+          const bad = section.sign === -1 ? ecart > 0 : ecart < 0;
+          ecartEl.style.color = bad ? "#B5533C" : "#2D6A6A";
+          ecartEl.textContent = (ecart >= 0 ? "+" : "") + Math.round(ecart) + "€";
+        } else {
+          ecartEl.textContent = "";
+        }
+      }
+    }
+  }
+
+  document.getElementById("footerLabel").textContent = "Solde " + MONTHS[monthIdx].toLowerCase();
+  document.getElementById("footerPrevu").textContent = "prévu " + eur(totals.soldePrevu);
+  const soldeEl = document.getElementById("footerSolde");
+  soldeEl.textContent = eur(totals.soldeReel);
+  soldeEl.style.color = totals.soldeReel >= 0 ? "#2D6A6A" : "#B5533C";
+}
+
+loadMonth(monthIdx);
+render();
+</script>
+</body>
+</html>
